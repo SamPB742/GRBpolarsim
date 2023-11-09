@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 typedef struct mode {
     double polarization;
@@ -21,9 +22,11 @@ double G(mode mode1, double corr_len);
 // Created by 4jung on 11/6/2023.
 //
 int main(void) {
-    double *turb = gen1dturb(.2, 1, 0, 100, 1);
+    //seed the random generator
+    srand(time(NULL));
+    double *turb = gen1dturb(.2, 1, 0, 10000, 1);
     //TODO figure out how to graph the result
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 10000; i++) {
         printf("%f\n", turb[i]);
     }
     free(turb);
@@ -74,7 +77,7 @@ double *gen1dturb(double sigma, double corr_len, double B0, int iters, double st
             double zeta = cos(all_modes[i].polarization);
             //TODO exponential factor only the real part
             double exp_factor = cos((all_modes[i].wavenumber * z) + all_modes[i].phase);
-            dB += A * zeta * exp_factor;
+            dB += A * exp_factor;
         }
        cumm += dB;
        field_vals[j] = cumm;
