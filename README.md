@@ -1,2 +1,2 @@
 # GRBpolarsim
-Code for GRB polarization simulation
+Code for GRB pol simulation
