@@ -19,12 +19,20 @@ typedef struct vector {
     double y;
     double z;
 } vector;
+typedef struct field_info {
+    double sigma;
+    double corr_len;
+    vector B0;
+    mode *modes;
+    double G_sum;
+} field_info;
 
 double *gen1dturb(double sigma, double corr_len, double B0, int iters, double step);
 double genRandDouble(double start, double stop);
 struct mode* genModes(double min_k, double max_k, int num, int dim);
 double G(mode mode1, double corr_len, int dim);
-vector *gen3dturb(double sigma, double corr_len, vector B0, int iters, double step, int dim);
+field_info init_3d_field(double sigma, double corr_len, vector B0);
+vector eval_field(vector loc, field_info info);
 vector modeCoords(vector v, mode m);
 vector addVectors(vector v, vector w);
 vector multVector(double s, vector v);
@@ -41,12 +49,14 @@ int main(int argc, char **argv) {
     //printf("vals: %f\n%f\n ", sigma, B0);
     //seed the random generator
     srand(time(NULL));
-    double *turb = gen3dturb(sigma, 1, B0v, 1000, .1, 3);
-    //TODO figure out how to graph the result
+    field_info fieldInfo = init_3d_field(sigma, 1, B0v);
+
+    //TODO generate the spiral location vectors
+
     for (int i = 0; i < 1000; i++) {
-        printf("%f\n", turb[i]);
+        printf("%f\n", eval_field(vec, fieldInfo));
     }
-    free(turb);
+    //TODO figure out how to graph the result
     return 0;
 }
 
@@ -95,9 +105,9 @@ double *gen1dturb(double sigma, double corr_len, double B0, int iters, double st
                 //(see G&J eq 3)
                 for (int i = 0; i < 20; i++) {
                     double A = sigma * sqrt(G(all_modes[i], corr_len, 1) / G_sum);
-                    //TODO currently using cos(pol) for xi hat in G&J eq 3
+                    // currently using cos(pol) for xi hat in G&J eq 3
                     double zeta = cos(all_modes[i].pol);
-                    //TODO exponential factor only the real part
+                    // exponential factor only the real part
                     double exp_factor = cos((all_modes[i].k * z) + all_modes[i].phase);
                     dB += A * exp_factor;
                 }
@@ -109,26 +119,27 @@ double *gen1dturb(double sigma, double corr_len, double B0, int iters, double st
 }*/
 
 /*
- * Generate 3d turbulence and return an array of sampled values from it
- * of size iters^3 with step size step. The magnetic turbulence variance
- * sigma, the correlation length corr_len, and the background magnetic
- * field strength B0 are all included as parameters.
+ * Initializes a 3d turbulent B-field by generating the modes and precalculating
+ * G_sum. Stores relevant information for calculating field vector at an arbitrary
+ * point for later use in the returned field_info struct
  *
- * Returns: a pointer to an array of size iters^3 containing the field strength
- * at the sampled points. Each of these is the background field plus the
- * x-component of the calculated dB for that step. Returns NULL if anything goes wrong.
- * TODO return a whole 3d matrix of vectors instead of just a list at specific (x,y)
+ * Returns: a field_info struct containing the sigma, correlation length,
+ * B0 vector, generated modes, and precalculated G_sum
  */
-vector *gen3dturb(double sigma, double corr_len, vector B0, int iters, double step, int dim) {
+field_info init_3d_field(double sigma, double corr_len, vector B0) {
+    field_info fieldInfo;
+    fieldInfo.sigma = sigma;
+    fieldInfo.corr_len = corr_len;
+    fieldInfo.B0 = B0;
     //TODO allow k generation to be more flexible
     //generate 10 modes with wavenumbers 1-3 (as in Baring turb)
-    mode *lower_modes = genModes(1, 3, 10, dim);
+    mode *lower_modes = genModes(1, 3, 10, 3);
     //generate 10 modes with wavenumbers 3-10 (as in Baring turb)
-    mode *higher_modes = genModes(3, 10, 10, dim);
+    mode *higher_modes = genModes(3, 10, 10, 3);
     //Error checking
     if (lower_modes == NULL || higher_modes == NULL) {
         printf("Mode generation failed");
-        return NULL;
+        fieldInfo.modes = NULL;
     }
 
     mode *all_modes = malloc(20 * sizeof(*all_modes));
@@ -139,41 +150,42 @@ vector *gen3dturb(double sigma, double corr_len, vector B0, int iters, double st
     free(higher_modes);
     higher_modes = NULL;
 
+    fieldInfo.modes = all_modes;
+
     //calculate sum of G for all modes first
     double G_sum = 0;
     for (int i = 0; i < 20; i++) {
         G_sum += G(all_modes[i], corr_len, 3);
     }
+    fieldInfo.G_sum = G_sum;
 
-    //go through each of the (x,y,z) locations and put a vector there
-    vector *field_vals = malloc((int) pow(iters, 3) * sizeof(*field_vals));
-    //temporarily setting constant values of x and y TODO return a 3d matrix
-    for (int j = 0; j < iters; j += 1) {
-        for (int k = 0; k < iters; k += 1) {
-            for (int l = 0; l < iters; l += 1) {
-                vector loc = {j * step, k * step, l * step};
-                vector dB = {0, 0, 0};
-                //calculate the element of the total sum from each mode
-                //(see G&J eq 3)
-                for (int i = 0; i < 20; i++) {
-                    mode m = all_modes[i];
-                    vector vprime = modeCoords(loc, m);
-                    double A = sigma * sqrt(G(m, corr_len, dim) / G_sum);
-                    vector xp_hat = {cos(m.theta) * cos(m.phi), cos(m.theta) * sin(m.phi), -1 * sin(m.theta)};
-                    vector yp_hat = {-1 * sin(m.phi), cos(m.phi), 0};
-                    //these two factors times x prime hat and y prime hat respectively are the
-                    //real components of what we will add to dB
-                    double xph_factor = A * cos(m.pol) * cos(m.k * vprime.z + m.phase);
-                    double yph_factor = A * -1 * sin(m.pol) * sin(m.k * vprime.z + m.phase);
-                    //total addition to dB from this mode
-                    vector res = addVectors(multVector(xph_factor, xp_hat), multVector(yph_factor, yp_hat));
-                    dB = addVectors(dB, res);
-                }
-                field_vals[VEC_FLD_IDX(loc.x,loc.y,loc.z,iters)] = addVectors(B0, dB); //TODO confirm 3d array works
-            }
-        }
+    return fieldInfo;
+}
+
+/*
+ * Given vector location, a set of generated modes, and TODO whatever else it needs
+ * returns the magnetic field at the provided location.
+ * Assumes 3d field
+ */
+vector eval_field(vector loc, field_info info) {
+    vector dB = {0, 0, 0};
+    //calculate the element of the total sum from each mode
+    //(see G&J eq 3)
+    for (int i = 0; i < 20; i++) {
+        mode m = info.modes[i];
+        vector vprime = modeCoords(loc, m);
+        double A = info.sigma * sqrt(G(m, info.corr_len, 3) / info.G_sum);
+        vector xp_hat = {cos(m.theta) * cos(m.phi), cos(m.theta) * sin(m.phi), -1 * sin(m.theta)};
+        vector yp_hat = {-1 * sin(m.phi), cos(m.phi), 0};
+        //these two factors times x prime hat and y prime hat respectively are the
+        //real components of what we will add to dB
+        double xph_factor = A * cos(m.pol) * cos(m.k * vprime.z + m.phase);
+        double yph_factor = A * -1 * sin(m.pol) * sin(m.k * vprime.z + m.phase);
+        //total addition to dB from this mode
+        vector res = addVectors(multVector(xph_factor, xp_hat), multVector(yph_factor, yp_hat));
+        dB = addVectors(dB, res);
     }
-    return field_vals;
+    return addVectors(info.B0, dB);
 }
 
 /*
