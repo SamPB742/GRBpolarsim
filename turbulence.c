@@ -36,7 +36,9 @@ vector eval_field(vector loc, field_info info);
 vector modeCoords(vector v, mode m);
 vector addVectors(vector v, vector w);
 vector multVector(double s, vector v);
-
+double vecMag(vector v);
+double vecDotProd(vector v, vector w);
+vector vecCrossProd(vector v, vector w);
 //
 // Created by 4jung on 11/6/2023.
 //
@@ -51,11 +53,20 @@ int main(int argc, char **argv) {
     srand(time(NULL));
     field_info fieldInfo = init_3d_field(sigma, 1, B0v);
 
-    //TODO generate the spiral location vectors
+    double helix_rad = 10;
+    double helix_len = 20;
+    double num_rots = 10;
+    for (int i = 0; i < num_rots * 100; i++) {
+        //helix parameterized by i value
+        double j = i / 100.0; //each rotation divided into 100 chunks
+        vector loc = {helix_rad * cos(2 * M_PI * j), helix_rad * sin(2 * M_PI * j), helix_len * j};
+        vector tan = {-2 * M_PI * helix_rad * sin(2 * M_PI * j), 2 * M_PI * helix_rad * cos(2 * M_PI * j), helix_len};
+        vector field = eval_field(loc, fieldInfo);
+        //magnitude of cross divided by magnitudes of vectors is sine
+        printf("%f\n", vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
 
-    for (int i = 0; i < 1000; i++) {
-        printf("%f\n", eval_field(vec, fieldInfo));
     }
+
     //TODO figure out how to graph the result
     return 0;
 }
@@ -211,11 +222,20 @@ vector multVector(double s, vector v) {
     return result;
 }
 
+double vecMag(vector v) {
+    return sqrt(v.x*v.x + v.y*v.y + v.z*v.z);
+};
 
+double vecDotProd(vector v, vector w) {
+    return (v.x*w.x) + (v.y*w.y) + (v.z*w.z);
+}
 
+vector vecCrossProd(vector v, vector w) {
+    vector prod = {(v.y*w.z)-(v.z*w.y), (v.x*w.z)-(v.z*w.x), (v.x*w.y)-(w.y-v.x)};
+    return prod;
+}
 /*
  * Generates num random mode structs with wavenumbers between min_k and max_k
- * TODO currently sets theta=0 in all of them!
  * Caller is responsible for deallocating returned pointer!
  */
 mode *genModes(double min_k, double max_k, int num, int dim){
@@ -271,4 +291,5 @@ double genRandDouble(double start, double stop){
    double random = rand() / (double)(RAND_MAX);
    double scaled = random * (stop - start);
    return scaled + start;
-};
+}
+
