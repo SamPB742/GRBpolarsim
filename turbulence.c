@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
 
     }
 
+
     //TODO figure out how to graph the result
     return 0;
 }
@@ -231,7 +232,7 @@ double vecDotProd(vector v, vector w) {
 }
 
 vector vecCrossProd(vector v, vector w) {
-    vector prod = {(v.y*w.z)-(v.z*w.y), (v.x*w.z)-(v.z*w.x), (v.x*w.y)-(w.y-v.x)};
+    vector prod = {(v.y*w.z)-(v.z*w.y), (v.z*w.x)-(v.x*w.z), (v.x*w.y)-(v.y*w.x)};
     return prod;
 }
 /*
