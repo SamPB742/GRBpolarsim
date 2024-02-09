@@ -39,6 +39,7 @@ vector multVector(double s, vector v);
 double vecMag(vector v);
 double vecDotProd(vector v, vector w);
 vector vecCrossProd(vector v, vector w);
+void histogram(double *arr, int num_vals, double start, double bin_size, int num_bins);
 //
 // Created by 4jung on 11/6/2023.
 //
@@ -53,9 +54,10 @@ int main(int argc, char **argv) {
     srand(time(NULL));
     field_info fieldInfo = init_3d_field(sigma, 1, B0v);
 
-    double helix_rad = 10;
-    double helix_len = 20;
-    double num_rots = 10;
+    double helix_rad = 1;
+    double helix_len = 4;
+    int num_rots = 10;
+    double stored_vals[num_rots * 100];
     for (int i = 0; i < num_rots * 100; i++) {
         //helix parameterized by i value
         double j = i / 100.0; //each rotation divided into 100 chunks
@@ -63,9 +65,14 @@ int main(int argc, char **argv) {
         vector tan = {-2 * M_PI * helix_rad * sin(2 * M_PI * j), 2 * M_PI * helix_rad * cos(2 * M_PI * j), helix_len};
         vector field = eval_field(loc, fieldInfo);
         //magnitude of cross divided by magnitudes of vectors is sine
-        printf("%f\n", vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
+       // printf("%f\n", vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
+        double sin_theta = (vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
+        double B_val = vecMag(field);
+        stored_vals[i] = B_val * sin_theta;
 
     }
+
+    histogram(stored_vals, num_rots * 100, B0 * .3, .01 * B0, 70);
 
 
     //TODO figure out how to graph the result
@@ -292,5 +299,34 @@ double genRandDouble(double start, double stop){
    double random = rand() / (double)(RAND_MAX);
    double scaled = random * (stop - start);
    return scaled + start;
+}
+/*
+ * goes through the values in arr and tallies frequency in each of num_bins
+ * bins of size bin_size. outputs results in a format for gnuplot histogram plotting
+ */
+void histogram(double *arr, int num_vals, double start, double bin_size, int num_bins) {
+    double max = start + (bin_size * num_bins);
+    int freqs[num_bins] = {};
+
+    //calculate frequencies
+    for (int i = 0; i < num_vals; i++) {
+        if(arr[i] < start) {
+            printf("Warning: %f is less than start value of %f, omitting from histogram.\n", arr[i], start);
+
+        }
+        else if(arr[i] > max) {
+            printf("Warning: %f is greater than max value of %f, omitting from histogram.\n", arr[i], max);
+        }
+        else {
+            freqs[(int) floor((arr[i] - start) / bin_size)] += 1;
+        }
+    }
+    //print bin centers and freqs on successive lines,
+    //required form for gnuplot histogram
+    for (int i = 0; i < num_bins; i++) {
+        double bin_center = start + (bin_size * i) + (bin_size / 2);
+
+        printf("%f %d\n", bin_center, freqs[i]);
+    }
 }
 
