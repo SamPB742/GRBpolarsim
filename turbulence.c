@@ -54,9 +54,13 @@ int main(int argc, char **argv) {
     srand(time(NULL));
     field_info fieldInfo = init_3d_field(sigma, 1, B0v);
 
-    double helix_rad = 1;
-    double helix_len = 4;
-    int num_rots = 10;
+    double helix_rad = 1 * 0.267949; // for 15 deg
+    //double helix_rad = 1; // for 45 deg
+    //double helix_rad = 1 * 3.73205; //for 75 deg
+    double helix_len = 2 * M_PI;
+    //for helix centered on z-axis, angle with z axis is
+    //arctan(2pi * (rad/len))
+    int num_rots = 100;
     double stored_vals[num_rots * 100];
     for (int i = 0; i < num_rots * 100; i++) {
         //helix parameterized by i value
@@ -68,11 +72,12 @@ int main(int argc, char **argv) {
        // printf("%f\n", vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
         double sin_theta = (vecMag(vecCrossProd(field, tan)) / (vecMag(field) * vecMag(tan)));
         double B_val = vecMag(field);
-        stored_vals[i] = B_val * sin_theta;
+        stored_vals[i] = sin_theta;
+        //printf("%f\n", sin_theta);
 
     }
 
-    histogram(stored_vals, num_rots * 100, B0 * .3, .01 * B0, 70);
+    histogram(stored_vals, num_rots * 100, 0, .001 * B0, 1500);
 
 
     //TODO figure out how to graph the result
