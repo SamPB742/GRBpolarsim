@@ -109,7 +109,9 @@ int main(int argc, char **argv) {
     vecPrint(vecRotate(test_x, 45, 0));
     printf("\n should be (0, 1, 0)\n");
     vecPrint(vecRotate(test_x, 0, M_PI/2));
-    printf("\n All components should be %f\n", sqrt(3.0));
+    printf("\n should be (0, 0, 1)\n");
+    vecPrint(vecRotate(test_y, M_PI/2, 0));
+    printf("\n should be (-.5, .5, .707)");
     vecPrint(vecRotate(test_y, M_PI/4, M_PI/4));
     break;
 
