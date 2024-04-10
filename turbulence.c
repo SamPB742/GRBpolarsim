@@ -4,6 +4,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "vvector.h"
+
 //index into a square 3d matrix
 #define VEC_FLD_IDX(x, y, z, s) ((int)((x*s*s) + (y*s) + z))
 
@@ -44,12 +46,12 @@ vector eval_field(vector loc, field_info info);
 vector modeCoords(vector v, mode m);
 vector addVectors(vector v, vector w);
 vector multVector(double s, vector v);
-pvector relPolarCoords(vector ref, vector v);
+vector relPolarCoords(vector ref, vector v);
 vector vecRotate(vector v, double theta, double phi);
 double vecMag(vector v);
 double vecDotProd(vector v, vector w);
 vector vecCrossProd(vector v, vector w);
-void vecPrint(vector v);
+void vecPrint(vector v, char* name);
 
 void histogram(double *arr, int num_vals, double start, double bin_size, int num_bins);
 
@@ -69,8 +71,8 @@ int main(int argc, char **argv) {
   field_info fieldInfo = init_3d_field(sigma, 1, B0v);
 
   //double helix_rad = 1 * 0.267949; // for 15 deg
-  //double helix_rad = 1; // for 45 deg
-  double helix_rad = 1 * 3.73205; //for 75 deg
+  double helix_rad = 1; // for 45 deg
+  //double helix_rad = 1 * 3.73205; //for 75 deg
   double helix_len = 2 * M_PI;
   //for helix centered on z-axis, angle with z axis is
   //arctan(2pi * (rad/len))
@@ -86,6 +88,8 @@ int main(int argc, char **argv) {
     vector field = eval_field(loc, fieldInfo);
     //E vector in plane of photon k vector for parallel pol state
     vector E_parallel = vecCrossProd(vecCrossProd(field, e_momentum), e_momentum);
+    vector norm_E_parallel = multVector(1/ vecMag(E_parallel), E_parallel);
+    //printf("vector e_momentum: (%f, %f, %f)\n", e_momentum.x, e_momentum.y, e_momentum.z);
 
     //magnitude of cross divided by magnitudes of vectors is sine
     // printf("%f\n", vecMag(vecCrossProd(field, e_momentum)) / (vecMag(field) * vecMag(e_momentum)));
@@ -100,21 +104,13 @@ int main(int argc, char **argv) {
     //printf("%f\n", sin_theta);
 
     //TODO calculate polar coords of E_parallel wrt e_momentum
-
-
-    //Rotation Tests
-    vector test_x = {1,0,0};
-    vector test_y = {0,1,0};
-    printf("Should be (1,0,0)\n");
-    vecPrint(vecRotate(test_x, 45, 0));
-    printf("\n should be (0, 1, 0)\n");
-    vecPrint(vecRotate(test_x, 0, M_PI/2));
-    printf("\n should be (0, 0, 1)\n");
-    vecPrint(vecRotate(test_y, M_PI/2, 0));
-    printf("\n should be (-.5, .5, .707)");
-    vecPrint(vecRotate(test_y, M_PI/4, M_PI/4));
-    break;
-
+    vector retval = relPolarCoords(e_momentum, norm_E_parallel);
+    //Stokes Q
+    //stored_vals[i] = retval.y * retval.y - retval.x * retval.x;
+    //printf("%f\n", stored_vals[i]);
+    //Stokes U
+    stored_vals[i] = 2 * retval.y * retval.x;
+    //printf("%f\n", stored_vals[i]);
 
   }
 
@@ -276,21 +272,54 @@ vector multVector(double s, vector v) {
 }
 
 /*
- * Calculates the polar coordinates of the vector v about the vector rel
+ * Calculates the polar coordinates of the vector v about the vector ref
  * Returns in the form of a polar coord vector
  */
-pvector relPolarCoords(vector ref, vector v) {
+vector relPolarCoords(vector ref, vector v) {
   //start with three basis vectors
   vector x = {1,0,0};
   vector y = {0,1,0};
   vector z = {0,0,1};
-  //calculate rotations required to align z with rel
-  double theta = 0;//TODO
-  double phi = 0; //TODO
+  //calculate rotations required to align z with ref
+  double theta = acos(ref.z / vecMag(ref));
+  double phi = acos(ref.x / sqrt((ref.x * ref.x) + (ref.y * ref.y))) + M_PI_2;
+  if (ref.y < 0) {
+    phi *= -1;
+  }
   //perform rotations
+  vector newX = vecRotate(x, theta, phi);
+  vector newY = vecRotate(y, theta, phi);
+  vector newZ = vecRotate(z, theta, phi);
   //check that z and rel are parallel
+  //vecPrint(newX, "newX");
+  //vecPrint(newY, "newY");
+  //vecPrint(newZ, "newZ");
+  //vecPrint(vecRotate(v, theta, phi), "using rotation");
+
+//  vecPrint(ref, "ref");
+  //printf("z and rel should be parallel, their cross product is %f\n", vecMag(vecCrossProd(newZ, ref)));
+  //check that basis vectors still have length 1
+//  printf("new basis vectors have magnitudes %f, %f, and %f (should all be 1)\n", vecMag(newX), vecMag(newY), vecMag(newZ));
+//  printf("are basis vectors still perpendicular? (expect 0s) %f, %f, %f\n", vecDotProd(newX, newY), vecDotProd(newY, newZ),
+//         vecDotProd(newX, newZ));
   //get v components wrt new basis
-  //assign to pvector and return
+  //the columns of the change of basis matrix are made up of newX, newY, and newZ
+  double cob_mat[3][3] = {{newX.x, newY.x, newZ.x},
+                          {newX.y, newY.y, newZ.y},
+                          {newX.z, newY.z, newZ.z}};
+  //MAT_PRINT_3X3(cob_mat)
+  double cob_mat_inv[3][3];
+  double cob_mat_det;
+  //invers of a rotation matrix is the transpose
+  INVERT_3X3(cob_mat_inv, cob_mat_det, cob_mat)
+  //MAT_PRINT_3X3(cob_mat_inv)
+  vector retVec = {cob_mat_inv[0][0] * v.x + cob_mat_inv[0][1] * v.y + cob_mat_inv[0][2] * v.z,
+                   cob_mat_inv[1][0] * v.x + cob_mat_inv[1][1] * v.y + cob_mat_inv[1][2] * v.z,
+                   cob_mat_inv[2][0] * v.x + cob_mat_inv[2][1] * v.y + cob_mat_inv[2][2] * v.z,};
+  vecPrint(retVec, "using cob matrix");
+  //printf("cob vec magnitude is %f\n", vecMag(retVec));
+  //printf("\n");
+  return retVec;
 }
 
 /*
@@ -316,8 +345,8 @@ vector vecCrossProd(vector v, vector w) {
   return prod;
 }
 
-void vecPrint(vector v) {
-  printf("Vector: {%f, %f, %f}\n", v.x, v.y, v.z);
+void vecPrint(vector v, char* name) {
+  printf("%s: {%f, %f, %f}\n", name, v.x, v.y, v.z);
 }
 
 /*
