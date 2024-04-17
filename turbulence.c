@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
     //printf("%f\n", stored_vals[i]);
     //Stokes U
     stored_vals[i] = 2 * retval.y * retval.x;
-    //printf("%f\n", stored_vals[i]);
+    printf("%f\n", stored_vals[i]);
 
   }
 
@@ -276,49 +276,24 @@ vector multVector(double s, vector v) {
  * Returns in the form of a polar coord vector
  */
 vector relPolarCoords(vector ref, vector v) {
-  //start with three basis vectors
-  vector x = {1,0,0};
-  vector y = {0,1,0};
+  //z basis vector to compare against
   vector z = {0,0,1};
   //calculate rotations required to align z with ref
   double theta = acos(ref.z / vecMag(ref));
-  double phi = acos(ref.x / sqrt((ref.x * ref.x) + (ref.y * ref.y))) + M_PI_2;
+  double phi = acos(ref.x / sqrt((ref.x * ref.x) + (ref.y * ref.y)));
   if (ref.y < 0) {
     phi *= -1;
   }
-  //perform rotations
-  vector newX = vecRotate(x, theta, phi);
-  vector newY = vecRotate(y, theta, phi);
+  phi += M_PI_2; //consistently off by this amount
+  //perform rotation
   vector newZ = vecRotate(z, theta, phi);
   //check that z and rel are parallel
-  //vecPrint(newX, "newX");
-  //vecPrint(newY, "newY");
+  //vecPrint(ref, "ref");
   //vecPrint(newZ, "newZ");
-  //vecPrint(vecRotate(v, theta, phi), "using rotation");
-
-//  vecPrint(ref, "ref");
   //printf("z and rel should be parallel, their cross product is %f\n", vecMag(vecCrossProd(newZ, ref)));
-  //check that basis vectors still have length 1
-//  printf("new basis vectors have magnitudes %f, %f, and %f (should all be 1)\n", vecMag(newX), vecMag(newY), vecMag(newZ));
-//  printf("are basis vectors still perpendicular? (expect 0s) %f, %f, %f\n", vecDotProd(newX, newY), vecDotProd(newY, newZ),
-//         vecDotProd(newX, newZ));
-  //get v components wrt new basis
-  //the columns of the change of basis matrix are made up of newX, newY, and newZ
-  double cob_mat[3][3] = {{newX.x, newY.x, newZ.x},
-                          {newX.y, newY.y, newZ.y},
-                          {newX.z, newY.z, newZ.z}};
-  //MAT_PRINT_3X3(cob_mat)
-  double cob_mat_inv[3][3];
-  double cob_mat_det;
-  //invers of a rotation matrix is the transpose
-  INVERT_3X3(cob_mat_inv, cob_mat_det, cob_mat)
-  //MAT_PRINT_3X3(cob_mat_inv)
-  vector retVec = {cob_mat_inv[0][0] * v.x + cob_mat_inv[0][1] * v.y + cob_mat_inv[0][2] * v.z,
-                   cob_mat_inv[1][0] * v.x + cob_mat_inv[1][1] * v.y + cob_mat_inv[1][2] * v.z,
-                   cob_mat_inv[2][0] * v.x + cob_mat_inv[2][1] * v.y + cob_mat_inv[2][2] * v.z,};
-  vecPrint(retVec, "using cob matrix");
-  //printf("cob vec magnitude is %f\n", vecMag(retVec));
-  //printf("\n");
+  //apply the same rotation to v
+  vector newV = vecRotate(v, theta, phi);
+  vector retVec = multVector(1/ vecMag(newV), newV); //normalize newV
   return retVec;
 }
 
